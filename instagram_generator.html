@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram投稿文ジェネレーター</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #fafafa; }
+    h1 { color: #333; font-size: 1.4em; }
+    label { display: block; margin-top: 16px; font-weight: bold; color: #555; }
+    input, textarea, select { width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em; box-sizing: border-box; }
+    button { margin-top: 24px; width: 100%; padding: 12px; background: #E1306C; color: white; border: none; border-radius: 8px; font-size: 1em; cursor: pointer; }
+    button:hover { background: #c1255a; }
+    #output { margin-top: 24px; background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; white-space: pre-wrap; line-height: 1.8; display: none; }
+    #copy-btn { background: #555; display: none; }
+    #copy-btn:hover { background: #333; }
+  </style>
+</head>
+<body>
+  <h1>📸 Instagram投稿文ジェネレーター</h1>
+
+  <label>カテゴリ</label>
+  <select id="category">
+    <option value="行事">行事</option>
+    <option value="授業">授業</option>
+    <option value="日常風景">日常風景</option>
+    <option value="入学情報">入学情報</option>
+  </select>
+
+  <label>学年</label>
+  <input type="text" id="grade" placeholder="例：5年生">
+
+  <label>行事・授業名</label>
+  <input type="text" id="event" placeholder="例：千葉大学留学生との交流会">
+
+  <label>内容のポイント</label>
+  <textarea id="points" rows="3" placeholder="例：身ぶり手ぶりで交流、笑顔、異文化理解"></textarea>
+
+  <button onclick="generate()">投稿文を生成する</button>
+
+  <div id="output"></div>
+  <button id="copy-btn" onclick="copyText()">📋 コピーする</button>
+
+  <script>
+    function generate() {
+      const category = document.getElementById('category').value;
+      const grade = document.getElementById('grade').value || '〇年生';
+      const event = document.getElementById('event').value || '〇〇';
+      const points = document.getElementById('points').value || '';
+
+      const emojis = { '行事': '🎉', '授業': '📚', '日常風景': '☀️', '入学情報': '🌸' };
+      const emoji = emojis[category];
+
+      const pointList = points.split(/[、,，\n]/).map(p => p.trim()).filter(p => p);
+      const descriptions = pointList.slice(0, 3).map(p => `${p}、`).join('\n').replace(/、$/, '。');
+
+      const closings = [
+        `子どもたちの真剣な姿が、とても輝いていました 😊`,
+        `教室にたくさんの笑顔が広がる時間になりました 😊`,
+        `「やってみたい」という気持ちが、学びを深める時間になりました 😊`,
+        `子どもたちの成長を感じる、温かな時間になりました 😊`
+      ];
+      const closing = closings[Math.floor(Math.random() * closings.length)];
+
+      const hashtags = `#昭和学院 #昭和学院小学校 #小学校 #市川 #私立小学校 #${event.replace(/\s/g,'')}`;
+
+      const text = `${grade}が、${event}を行いました ${emoji}\n\n${descriptions}\n\n${closing}\n\n${hashtags}`;
+
+      const output = document.getElementById('output');
+      output.textContent = text;
+      output.style.display = 'block';
+      document.getElementById('copy-btn').style.display = 'block';
+    }
+
+    function copyText() {
+      const text = document.getElementById('output').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        document.getElementById('copy-btn').textContent = '✅ コピーしました！';
+        setTimeout(() => { document.getElementById('copy-btn').textContent = '📋 コピーする'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
