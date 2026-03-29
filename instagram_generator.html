@@ -29,7 +29,7 @@
   <div class="api-section">
     <label>🔑 Anthropic APIキー</label>
     <input type="password" id="apikey" placeholder="sk-ant-..." autocomplete="off">
-    <p class="hint">入力したキーはこのページ内のみで使用されます。外部には送信されません。</p>
+    <p class="hint">入力したキーはこのブラウザにのみ保存されます。外部には送信されません。</p>
   </div>
 
   <label>カテゴリ</label>
@@ -58,6 +58,19 @@
   <button id="copy-btn" onclick="copyText()">📋 コピーする</button>
 
   <script>
+    // ページ読み込み時にAPIキーを復元
+    window.addEventListener('load', () => {
+      const saved = localStorage.getItem('anthropic_api_key');
+      if (saved) document.getElementById('apikey').value = saved;
+    });
+
+    // APIキーが変更されたら保存
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('apikey').addEventListener('change', (e) => {
+        if (e.target.value) localStorage.setItem('anthropic_api_key', e.target.value);
+      });
+    });
+
     async function generate() {
       const apiKey = document.getElementById('apikey').value.trim();
       const category = document.getElementById('category').value;
