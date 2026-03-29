@@ -11,14 +11,26 @@
     input, textarea, select { width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 1em; box-sizing: border-box; }
     button { margin-top: 24px; width: 100%; padding: 12px; background: #E1306C; color: white; border: none; border-radius: 8px; font-size: 1em; cursor: pointer; }
     button:hover { background: #c1255a; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
     #output { margin-top: 24px; background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; white-space: pre-wrap; line-height: 1.8; display: none; font-size: 0.95em; }
     #copy-btn { background: #555; display: none; }
     #copy-btn:hover { background: #333; }
     .hint { font-size: 0.8em; color: #999; margin-top: 4px; }
+    .api-section { background: #fff8f0; border: 1px solid #f0d9c0; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+    .api-section label { color: #a05a00; }
+    .api-section input { font-family: monospace; font-size: 0.85em; }
+    .loading { text-align: center; color: #999; padding: 20px; display: none; }
+    .error { color: #c0392b; background: #fdecea; border-radius: 6px; padding: 12px; margin-top: 16px; display: none; }
   </style>
 </head>
 <body>
   <h1>📸 Instagram投稿文ジェネレーター</h1>
+
+  <div class="api-section">
+    <label>🔑 Anthropic APIキー</label>
+    <input type="password" id="apikey" placeholder="sk-ant-..." autocomplete="off">
+    <p class="hint">入力したキーはこのページ内のみで使用されます。外部には送信されません。</p>
+  </div>
 
   <label>カテゴリ</label>
   <select id="category">
@@ -35,178 +47,117 @@
   <input type="text" id="event" placeholder="例：千葉大学留学生との交流会">
 
   <label>内容のポイント</label>
-  <textarea id="points" rows="4" placeholder="例：身ぶり手ぶりで交流、笑顔、異文化理解&#10;（複数ある場合は改行か読点で区切ってください）"></textarea>
-  <p class="hint">ポイントを詳しく書くほど文章のクオリティが上がります</p>
+  <textarea id="points" rows="4" placeholder="例：身ぶり手ぶりで交流、笑顔、異文化理解&#10;（キーワードを箇条書きでもOKです）"></textarea>
+  <p class="hint">キーワードを入れるほど文章が豊かになります</p>
 
-  <button onclick="generate()">投稿文を生成する</button>
+  <button id="generate-btn" onclick="generate()">投稿文を生成する</button>
 
+  <div class="loading" id="loading">✨ 生成中です...</div>
+  <div class="error" id="error"></div>
   <div id="output"></div>
   <button id="copy-btn" onclick="copyText()">📋 コピーする</button>
 
   <script>
-    // カテゴリ別の絵文字
-    const categoryEmoji = {
-      '行事': ['🎉', '🏆', '🌟', '🎊'],
-      '授業': ['📚', '✏️', '🔬', '🎨'],
-      '日常風景': ['☀️', '🌈', '🍃', '💫'],
-      '入学情報': ['🌸', '🎒', '✨', '🌷']
-    };
-
-    // カテゴリ別の情景描写テンプレート
-    const sceneTemplates = {
-      '行事': [
-        (p) => `${p}ながら、`,
-        (p) => `${p}場面では、`,
-        (p) => `${p}様子が見られ、`,
-      ],
-      '授業': [
-        (p) => `${p}ながら、`,
-        (p) => `${p}する姿が見られ、`,
-        (p) => `${p}たりと、`,
-      ],
-      '日常風景': [
-        (p) => `${p}ながら、`,
-        (p) => `${p}場面があったり、`,
-        (p) => `${p}する様子で、`,
-      ],
-      '入学情報': [
-        (p) => `${p}ながら、`,
-        (p) => `${p}する姿が見られ、`,
-        (p) => `${p}たりと、`,
-      ]
-    };
-
-    // カテゴリ別の締め文テンプレート
-    const closingTemplates = {
-      '行事': [
-        '子どもたちの真剣な姿と笑顔が、会場いっぱいに広がる時間になりました',
-        '仲間と力を合わせながら、大切な思い出をつくることができました',
-        '子どもたちの成長を感じる、温かな一日になりました',
-        '一人ひとりが輝く、すてきな時間になりました',
-      ],
-      '授業': [
-        '「わかった」「やってみたい」という気持ちが、学びを深める時間になりました',
-        '子どもたちの目がきらきらと輝く、充実した学びの時間になりました',
-        '友だちと考えを伝え合いながら、学びを深めることができました',
-        '子どもたちの豊かな発想に、教室が活気にあふれる時間になりました',
-      ],
-      '日常風景': [
-        '何気ない一コマの中に、子どもたちの成長が感じられます',
-        '子どもたちの笑顔があふれる、学校生活の一場面です',
-        '毎日の積み重ねの中で、子どもたちはすくすくと育っています',
-        '子どもたちの元気な姿に、こちらまで温かい気持ちになります',
-      ],
-      '入学情報': [
-        '昭和学院小学校で、お子さんの新しい一歩を踏み出しませんか',
-        'たくさんのご応募をお待ちしております',
-        '子どもたちの豊かな学びと成長を、全力でサポートします',
-        'ご不明な点はお気軽にお問い合わせください',
-      ]
-    };
-
-    // ハッシュタグのキーワードマッピング
-    const hashtagMap = {
-      '交流': ['#国際交流', '#異文化理解'],
-      '留学生': ['#留学生交流', '#国際交流'],
-      '運動会': ['#運動会', '#体育'],
-      '遠足': ['#遠足', '#校外学習'],
-      '音楽': ['#音楽', '#合唱', '#演奏'],
-      '図工': ['#図工', '#アート', '#図画工作'],
-      '理科': ['#理科', '#実験', '#理科の授業'],
-      '算数': ['#算数', '#数学', '#算数の授業'],
-      '国語': ['#国語', '#読書', '#国語の授業'],
-      '社会': ['#社会', '#社会科', '#社会の授業'],
-      '体育': ['#体育', '#スポーツ'],
-      '給食': ['#給食', '#食育'],
-      '掃除': ['#掃除', '#清掃活動'],
-      '読書': ['#読書', '#図書', '#本'],
-      '英語': ['#英語', '#外国語活動'],
-      'プール': ['#水泳', '#プール'],
-      '入学': ['#入学', '#新入生', '#小学校入学'],
-      '卒業': ['#卒業', '#卒業式'],
-      '合唱': ['#合唱', '#音楽'],
-      '展覧会': ['#展覧会', '#作品展'],
-    };
-
-    function pickRandom(arr) {
-      return arr[Math.floor(Math.random() * arr.length)];
-    }
-
-    function buildHashtags(event, points, category) {
-      const base = '#昭和学院 #昭和学院小学校 #小学校 #市川 #私立小学校';
-      const extras = new Set();
-
-      const text = event + points;
-      for (const [keyword, tags] of Object.entries(hashtagMap)) {
-        if (text.includes(keyword)) {
-          tags.forEach(t => extras.add(t));
-        }
-      }
-
-      // カテゴリ別の固定タグ
-      if (category === '入学情報') extras.add('#入学説明会');
-      if (category === '行事') extras.add('#学校行事');
-      if (category === '授業') extras.add('#授業風景');
-      if (category === '日常風景') extras.add('#学校生活');
-
-      // イベント名からタグを生成（短い場合）
-      const eventClean = event.replace(/[をがはにのでとも]/g, '').trim();
-      if (eventClean.length <= 10 && eventClean.length > 1) {
-        extras.add(`#${eventClean}`);
-      }
-
-      const extraArr = Array.from(extras).slice(0, 5);
-      return base + (extraArr.length > 0 ? ' ' + extraArr.join(' ') : '');
-    }
-
-    function buildScene(pointList, category) {
-      if (pointList.length === 0) return '';
-
-      const templates = sceneTemplates[category];
-      const lines = pointList.slice(0, 4).map((p, i) => {
-        const tmpl = templates[i % templates.length];
-        return tmpl(p);
-      });
-
-      // 最後の行を調整
-      const last = lines[lines.length - 1].replace(/、$/, 'と、');
-      lines[lines.length - 1] = last;
-
-      return lines.join('\n') + '\n教室にはたくさんの笑顔が広がりました。';
-    }
-
-    function generate() {
+    async function generate() {
+      const apiKey = document.getElementById('apikey').value.trim();
       const category = document.getElementById('category').value;
       const grade = document.getElementById('grade').value.trim() || '〇年生';
       const event = document.getElementById('event').value.trim() || '〇〇';
-      const pointsRaw = document.getElementById('points').value.trim();
+      const points = document.getElementById('points').value.trim();
 
-      const pointList = pointsRaw
-        .split(/[、,，\n。]/)
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
+      if (!apiKey) {
+        showError('APIキーを入力してください。');
+        return;
+      }
+      if (!event || event === '〇〇') {
+        showError('行事・授業名を入力してください。');
+        return;
+      }
 
-      const emojis = categoryEmoji[category];
-      const emoji = pickRandom(emojis);
+      const btn = document.getElementById('generate-btn');
+      btn.disabled = true;
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('output').style.display = 'none';
+      document.getElementById('copy-btn').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
 
-      const scene = buildScene(pointList, category);
-      const closingBase = pickRandom(closingTemplates[category]);
-      const closing = `${closingBase} 😊`;
-      const hashtags = buildHashtags(event, pointsRaw, category);
+      const prompt = `昭和学院小学校のInstagram投稿文を作成してください。
 
-      const parts = [
-        `${grade}が、${event}を行いました ${emoji}`,
-        scene,
-        closing,
-        hashtags
-      ].filter(p => p);
+【入力情報】
+- カテゴリ：${category}
+- 学年：${grade}
+- 行事・授業名：${event}
+- 内容のポイント：${points || '（特になし）'}
 
-      const text = parts.join('\n\n');
+【出力ルール】
+- 1行目：「${grade}が、${event}を行いました」＋絵文字1個
+- 空行
+- 2〜4行：短い情景描写（体言止め・改行多め・読みやすく）。ポイントのキーワードを活かして、子どもたちの様子が目に浮かぶような自然な文章にすること。
+- 空行
+- 締めの1文：「〜する時間になりました」「〜が広がりました」など＋絵文字1個
+- 空行
+- ハッシュタグ：#昭和学院 #昭和学院小学校 #小学校 #市川 #私立小学校 ＋内容に合ったもの3〜5個
 
-      const output = document.getElementById('output');
-      output.textContent = text;
-      output.style.display = 'block';
-      document.getElementById('copy-btn').style.display = 'block';
+【文体のルール】
+- 温かみのある文体
+- 子どもたちの様子が目に浮かぶような表現
+- 「子ども」を使う（「子供」はNG）
+- 投稿文のみ出力（説明・前置き・コメント不要）
+
+【参考例】
+5年生が、千葉大学の留学生との交流会を行いました 🌍
+
+言葉や文化の違いにふれながら、
+身ぶり手ぶりで伝え合ったり、
+お互いの国について質問したりと、
+教室にはたくさんの笑顔が広がりました。
+
+「伝えたい」「知りたい」という気持ちによって、
+自然と交流が深まる時間になりました 😊
+
+#昭和学院 #昭和学院小学校 #小学校 #市川 #私立小学校 #留学生交流 #国際交流`;
+
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 512,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error?.message || `エラーが発生しました（${res.status}）`);
+        }
+
+        const data = await res.json();
+        const text = data.content[0].text.trim();
+
+        const output = document.getElementById('output');
+        output.textContent = text;
+        output.style.display = 'block';
+        document.getElementById('copy-btn').style.display = 'block';
+
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        btn.disabled = false;
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = '⚠️ ' + msg;
+      el.style.display = 'block';
     }
 
     function copyText() {
